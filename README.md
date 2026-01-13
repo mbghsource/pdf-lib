@@ -758,6 +758,8 @@ const pdfBytes = await pdfDoc.save()
 
 ### Set Document Metadata
 
+- [PDF/VT & OutputIntent support](./docs/PDFVT.md)
+
 _This example produces [this PDF](assets/pdfs/examples/set_document_metadata.pdf)_.
 
 [Try the JSFiddle demo](https://jsfiddle.net/Hopding/vcwmfnbe/2/)

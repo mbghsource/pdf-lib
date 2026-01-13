@@ -1,6 +1,7 @@
 import PDFDict, { DictMap } from 'src/core/objects/PDFDict';
 import PDFName from 'src/core/objects/PDFName';
 import PDFRef from 'src/core/objects/PDFRef';
+import PDFArray from 'src/core/objects/PDFArray';
 import PDFContext from 'src/core/PDFContext';
 import PDFPageTree from 'src/core/structures/PDFPageTree';
 import { PDFAcroForm } from 'src/core/acroform';
@@ -62,6 +63,31 @@ class PDFCatalog extends PDFDict {
       this.set(PDFName.of('ViewerPreferences'), viewerPrefsRef);
     }
     return viewerPrefs;
+  }
+
+  /** DPart support */
+  DPart(): PDFDict | undefined {
+    return this.lookupMaybe(PDFName.of('DPart'), PDFDict);
+  }
+
+  getDPart(): PDFDict | undefined {
+    const dict = this.DPart();
+    if (!dict) return undefined;
+    return dict;
+  }
+
+  setDPart(dpartRef: PDFRef) {
+    this.set(PDFName.of('DPart'), dpartRef);
+  }
+
+  /** OutputIntents support */
+  OutputIntents(): PDFArray | undefined {
+    const oi = this.lookupMaybe(PDFName.of('OutputIntents'), PDFArray);
+    return oi;
+  }
+
+  setOutputIntents(arrayRef: PDFArray | PDFRef) {
+    this.set(PDFName.of('OutputIntents'), arrayRef);
   }
 
   /**

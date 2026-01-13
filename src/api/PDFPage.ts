@@ -384,6 +384,31 @@ export default class PDFPage {
   }
 
   /**
+   * Attach a DPart node to this page, creating an internal cross-reference
+   * between the page and its logical record.
+   * @param node A DPart dictionary or an indirect reference to one.
+   */
+  setDPart(node: PDFDict | PDFRef): void {
+    assertIs(node, 'node', [
+      [PDFDict, 'PDFDict'],
+      [PDFRef, 'PDFRef'],
+    ]);
+    const nodeRef =
+      node instanceof PDFRef ? node : this.doc.context.register(node);
+    this.node.set(PDFName.of('DPart'), nodeRef);
+  }
+
+  /**
+   * Get the DPart node referenced by this page, if any.
+   * @returns The DPart dictionary, or undefined if none is set.
+   */
+  getDPart(): PDFDict | undefined {
+    const dpartRef = this.node.lookupMaybe(PDFName.of('DPart'), PDFRef as any);
+    if (!dpartRef) return undefined;
+    return this.doc.context.lookup(dpartRef, PDFDict);
+  }
+
+  /**
    * Get this page's width and height. For example:
    * ```js
    * const { width, height } = page.getSize()

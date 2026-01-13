@@ -18,3 +18,4 @@ export { default as PDFPage } from 'src/api/PDFPage';
 export { default as PDFEmbeddedPage } from 'src/api/PDFEmbeddedPage';
 export { default as PDFJavaScript } from 'src/api/PDFJavaScript';
 export { default as Embeddable } from 'src/api/Embeddable';
+export { default as DPart } from 'src/api/DPart';

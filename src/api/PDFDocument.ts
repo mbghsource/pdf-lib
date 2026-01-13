@@ -9,6 +9,7 @@ import PDFEmbeddedPage from 'src/api/PDFEmbeddedPage';
 import PDFFont from 'src/api/PDFFont';
 import PDFImage from 'src/api/PDFImage';
 import PDFPage from 'src/api/PDFPage';
+import DPart from 'src/api/DPart';
 import PDFForm from 'src/api/form/PDFForm';
 import { PageSizes } from 'src/api/sizes';
 import { StandardFonts } from 'src/api/StandardFonts';
@@ -260,6 +261,135 @@ export default class PDFDocument {
       form.deleteXFA();
     }
     return form;
+  }
+
+  /**
+   * Create a new DPartRoot for building ISO 16612-2 (PDF/VT) logical records.
+   */
+  createDPartRoot() {
+    return DPart.createRoot(this.context);
+  }
+
+  /**
+   * Attach a DPartRoot to the document catalog.
+   * @param dpart The DPart instance to attach.
+   */
+  setDPartRoot(dpart: DPart) {
+    const ref = this.context.register(dpart.asDict());
+    this.catalog.setDPart(ref);
+  }
+
+  /**
+   * Inject an XMP packet containing the GTS_PDFVT namespace and versioning
+   * information into the document's Metadata stream.
+   * @param version The PDF/VT version (e.g., '1.0').
+   * @param conformance The conformance string (e.g., 'PDF/VT-1').
+   */
+  setPDFVTXMP(version: string = '1.0', conformance: string = 'PDF/VT-1') {
+    const xmlns = 'http://www.gwg.org/pdfvt/1.0/';
+    const xmp =
+      `<?xpacket begin='\\uFEFF' id='W5M0MpCehiHzreSzNTczkc9d'?>\\n` +
+      `<x:xmpmeta xmlns:x='adobe:ns:meta/'>\\n` +
+      `  <rdf:RDF xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#'>\\n` +
+      `    <rdf:Description rdf:about='' xmlns:pdfvt='${xmlns}'>\\n` +
+      `      <pdfvt:Conformance>${conformance}</pdfvt:Conformance>\\n` +
+      `      <pdfvt:Version>${version}</pdfvt:Version>\\n` +
+      `    </rdf:Description>\\n` +
+      `  </rdf:RDF>\\n` +
+      `</x:xmpmeta>\\n` +
+      `<?xpacket end='w'?>`;
+
+    const metadataStream = this.context.stream(xmp, {
+      Type: 'Metadata',
+      Subtype: 'XML',
+    });
+    const metadataRef = this.context.register(metadataStream);
+    this.catalog.set(PDFName.of('Metadata'), metadataRef);
+  }
+
+  /**
+   * Embed an ICC profile as an OutputIntent and add it to the Catalog's
+   * OutputIntents array. The provided `icc` should be the raw ICC profile bytes.
+   */
+  attachOutputIntent(
+    icc: Uint8Array,
+    options: {
+      OutputConditionIdentifier?: string;
+      Info?: string;
+      RegistryName?: string;
+      S?: string;
+    } = {},
+  ) {
+    const {
+      OutputConditionIdentifier = 'Custom',
+      Info = '',
+      RegistryName = '',
+      S = 'GTS_PDFX',
+    } = options;
+
+    const iccStream = this.context.stream(icc, { N: 0 });
+    const iccRef = this.context.register(iccStream);
+
+    const oiDict = this.context.obj({
+      Type: 'OutputIntent',
+      S,
+      OutputConditionIdentifier,
+      Info,
+      RegistryName: RegistryName || undefined,
+      DestOutputProfile: iccRef,
+    });
+
+    const oiRef = this.context.register(oiDict);
+
+    let oiArray = this.catalog.OutputIntents();
+    if (!oiArray) {
+      oiArray = this.context.obj([oiRef]);
+      this.catalog.setOutputIntents(oiArray);
+    } else {
+      oiArray.push(oiRef);
+    }
+  }
+
+  /**
+   * Ensure all fonts and images are embedded and register a simple Names
+   * mapping (Fonts/Images) to help downstream validators identify resources.
+   */
+  async ensureResourcesForPrint() {
+    // Embed all fonts and images
+    await this.embedAll(this.fonts);
+    await this.embedAll(this.images);
+
+    // Build Names dictionary with Fonts and Images arrays (name/ref pairs)
+    const namesDict: any = {};
+
+    // Fonts
+    if (this.fonts.length > 0) {
+      const fontsArr = [];
+      for (let i = 0; i < this.fonts.length; i++) {
+        const f = this.fonts[i];
+        const name = this.context.addRandomSuffix('Fnt');
+        fontsArr.push(name);
+        fontsArr.push(f.ref);
+      }
+      namesDict.Fonts = fontsArr;
+    }
+
+    // Images
+    if (this.images.length > 0) {
+      const imgs = [];
+      for (let i = 0; i < this.images.length; i++) {
+        const im = this.images[i];
+        const name = this.context.addRandomSuffix('Img');
+        imgs.push(name);
+        imgs.push(im.ref);
+      }
+      namesDict.Images = imgs;
+    }
+
+    if (Object.keys(namesDict).length > 0) {
+      const namesObj = this.context.obj(namesDict);
+      this.catalog.set(PDFName.of('Names'), this.context.register(namesObj));
+    }
   }
 
   /**
