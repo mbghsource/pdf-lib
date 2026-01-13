@@ -1,0 +1,47 @@
+name: PDF/VT validation
+
+on:
+  pull_request:
+    types: [opened, synchronized, reopened]
+  push:
+    branches:
+      - feat/pdfvt-dpart-outputintent
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: yarn --frozen-lockfile
+
+      - name: Install ts-node and tsconfig-paths (dev-only)
+        run: yarn add -D ts-node tsconfig-paths
+
+      - name: Run PDF/VT sample generator
+        run: |
+          npx ts-node -r tsconfig-paths/register scripts/run_pdfvt_direct.ts
+          # capture the latest sample path
+          SAMPLE=$(ls -t /tmp/pdfvt-sample-*.pdf 2>/dev/null | head -n 1 || true)
+          if [ -z "$SAMPLE" ]; then
+            echo "No PDFVT sample found in /tmp" && exit 1
+          fi
+          echo "SAMPLE=$SAMPLE" > $GITHUB_ENV
+
+      - name: Validate PDF/VT structure
+        run: |
+          npx ts-node -r tsconfig-paths/register scripts/check_pdfvt.ts "$SAMPLE"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdfvt-sample
+          path: $SAMPLE
