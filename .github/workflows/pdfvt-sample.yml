@@ -1,0 +1,45 @@
+name: Verify PDF/VT sample
+
+on:
+  pull_request:
+    branches: [ master ]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [ feat/pdfvt-dpart-outputintent ]
+
+jobs:
+  build-and-run-sample:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: yarn --frozen-lockfile
+
+      - name: Build project
+        run: yarn build
+
+      - name: Run PDF/VT sample test
+        run: |
+          # Run Node app for test 19 and fail if no PDF produced
+          node apps/node/build/index.js 19
+          # The Node runner prints the output path; find a generated PDF in /tmp
+          FOUND_PDF=$(ls /tmp/*.pdf 2>/dev/null | tail -n 1 || true)
+          echo "FOUND_PDF=$FOUND_PDF"
+          if [ -z "$FOUND_PDF" ]; then
+            echo "No PDF found in /tmp — sample generation failed" && exit 1
+          fi
+
+      - name: Upload produced PDF as artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdfvt-sample
+          path: /tmp/*.pdf
