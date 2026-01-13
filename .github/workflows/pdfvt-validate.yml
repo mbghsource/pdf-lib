@@ -36,6 +36,20 @@ jobs:
           fi
           echo "SAMPLE=$SAMPLE" > $GITHUB_ENV
 
+      - name: Install qpdf (optional structural check)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y qpdf || true
+
+      - name: Run qpdf --check (if available)
+        run: |
+          if command -v qpdf >/dev/null 2>&1; then
+            echo "Running qpdf --check on $SAMPLE"
+            qpdf --check "$SAMPLE"
+          else
+            echo "qpdf not available; skipping structural qpdf check"
+          fi
+
       - name: Validate PDF/VT structure
         run: |
           npx ts-node -r tsconfig-paths/register scripts/check_pdfvt.ts "$SAMPLE"
