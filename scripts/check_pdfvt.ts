@@ -25,7 +25,7 @@ async function check(pdfPath: string) {
     } else if (kArray.size() === 0) {
       errors.push('DPartRoot K array is empty (expect at least one logical record)');
     } else {
-      // Verify children look like DPart nodes
+        // Defer page-count validation until pages are defined (checked later)
       for (let i = 0; i < kArray.size(); i++) {
         const entry = kArray.lookup(i) as any;
         // Expect indirect ref or dict
@@ -45,6 +45,16 @@ async function check(pdfPath: string) {
         const cType = childDict.get(PDFName.of('Type'));
         if (!cType || !cType.toString().includes('DPart')) {
           errors.push(`DPart child K[${i}] missing Type 'DPart'`);
+        }
+
+        // Check for ID and Name attributes used in VDP
+        const idAttr = childDict.get(PDFName.of('ID'));
+        if (!idAttr) {
+          errors.push(`DPart child K[${i}] missing required attribute 'ID'`);
+        }
+        const nameAttr = childDict.get(PDFName.of('Name'));
+        if (!nameAttr) {
+          errors.push(`DPart child K[${i}] missing required attribute 'Name'`);
         }
       }
     }
@@ -220,21 +230,21 @@ async function check(pdfPath: string) {
 
       // Images (only validate if present)
       const imgsArr = namesDict.lookupMaybe(PDFName.of('Images'), PDFArray as any);
-      if (imgsArr) {
-        if (imgsArr.size() % 2 !== 0) {
-          errors.push('Names/Images array must be name/ref pairs');
-        } else {
-          for (let i = 0; i < imgsArr.size(); i += 2) {
-            const imgRef = imgsArr.lookup(i + 1) as any;
-            const imgObj = imgRef instanceof PDFRef ? pdfDoc.context.lookup(imgRef) : imgRef;
-            if (!imgObj) {
-              errors.push(`Names/Images entry ${i / 2} does not resolve`);
-              continue;
-            }
-            // Expect a stream (XObject Image)
-            if (!(imgObj instanceof PDFStream)) {
-              errors.push(`Names/Images entry ${i / 2} is not a stream/XObject Image`);
-            }
+      if (!imgsArr || imgsArr.size() === 0) {
+        errors.push('Names must contain an /Images array with at least one registered image for VDP samples');
+      } else if (imgsArr.size() % 2 !== 0) {
+        errors.push('Names/Images array must be name/ref pairs');
+      } else {
+        for (let i = 0; i < imgsArr.size(); i += 2) {
+          const imgRef = imgsArr.lookup(i + 1) as any;
+          const imgObj = imgRef instanceof PDFRef ? pdfDoc.context.lookup(imgRef) : imgRef;
+          if (!imgObj) {
+            errors.push(`Names/Images entry ${i / 2} does not resolve`);
+            continue;
+          }
+          // Expect a stream (XObject Image)
+          if (!(imgObj instanceof PDFStream)) {
+            errors.push(`Names/Images entry ${i / 2} is not a stream/XObject Image`);
           }
         }
       }
