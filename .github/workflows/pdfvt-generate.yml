@@ -1,0 +1,46 @@
+name: Generate PDF/VT sample on push
+
+on:
+  push: {}
+
+jobs:
+  generate-and-upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: yarn --frozen-lockfile
+
+      - name: Install ts-node and tsconfig-paths (dev-only)
+        run: yarn add -D ts-node tsconfig-paths
+
+      - name: Generate PDF/VT sample
+        run: |
+          npx ts-node -r tsconfig-paths/register scripts/run_pdfvt_direct.ts
+          SAMPLE=$(ls -t /tmp/pdfvt-sample-*.pdf 2>/dev/null | head -n 1 || true)
+          if [ -z "$SAMPLE" ]; then
+            echo "No PDFVT sample found in /tmp" && exit 1
+          fi
+          echo "SAMPLE=$SAMPLE" > $GITHUB_ENV
+
+      - name: Run structural and semantic checks
+        run: |
+          if command -v qpdf >/dev/null 2>&1; then
+            echo "Running qpdf --check on $SAMPLE"
+            qpdf --check "$SAMPLE" || true
+          fi
+          npx ts-node -r tsconfig-paths/register scripts/check_pdfvt.ts "$SAMPLE"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdfvt-sample
+          path: $SAMPLE
