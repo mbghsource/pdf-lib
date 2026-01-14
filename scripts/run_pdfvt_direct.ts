@@ -18,13 +18,17 @@ import DPart from '../src/api/DPart';
     const font = await pdfDoc.embedFont(ubuntu);
 
     const droot = DPart.createRoot(pdfDoc.context);
-    // Create a larger VDP sample: multiple logical records with images
+    // Create a larger VDP sample: multiple logical records with varying images
     const recordsCount = 12;
 
-    // Small 1x1 PNG base64 (same as tests) to keep the example bundled
-    const tinyPngBase64 =
-      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQYV2NgYAAAAAMAAWgmWQ0AAAAASUVORK5CYII=';
-    const img = await pdfDoc.embedPng(tinyPngBase64);
+    const imageFiles = [
+      'small_mario.png',
+      'minions_laughing.jpg',
+      'cat_riding_unicorn.jpg',
+      'minions_banana_no_alpha.png',
+      'greyscale_bird.png',
+      'self_drive.png',
+    ];
 
     for (let i = 1; i <= recordsCount; i++) {
       const id = `rec-${i}`;
@@ -42,8 +46,21 @@ import DPart from '../src/api/DPart';
       page.drawText(`PDF/VT VDP Sample — ${id}`, { x: 50, y: 180, size: 14 });
       page.drawText(`Recipient: Recipient ${i}`, { x: 50, y: 160, size: 10 });
       page.drawText(`Sequence: ${i}`, { x: 50, y: 144, size: 10 });
-      // Draw the tiny image on the page
-      page.drawImage(img, { x: 300, y: 80, width: 48, height: 48 });
+
+      // Pick an image file per record and embed appropriately
+      const imgFile = imageFiles[(i - 1) % imageFiles.length];
+      const imgPath = `${assetsDir}images${sep}${imgFile}`;
+      let embeddedImg: any;
+      if (imgFile.toLowerCase().endsWith('.png')) {
+        const b = fs.readFileSync(imgPath);
+        embeddedImg = await pdfDoc.embedPng(b);
+      } else if (imgFile.toLowerCase().endsWith('.jpg') || imgFile.toLowerCase().endsWith('.jpeg')) {
+        const b = fs.readFileSync(imgPath);
+        embeddedImg = await pdfDoc.embedJpg(b);
+      }
+
+      if (embeddedImg) page.drawImage(embeddedImg, { x: 300, y: 80, width: 64, height: 64 });
+
       page.setDPart(record.asDict());
     }
 

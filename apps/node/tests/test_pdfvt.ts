@@ -14,9 +14,13 @@ export default async (assets: Assets) => {
   const droot = pdfDoc.createDPartRoot();
   const numRecords = 10;
 
-  const tinyPngBase64 =
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQYV2NgYAAAAAMAAWgmWQ0AAAAASUVORK5CYII=';
-  const img = await pdfDoc.embedPng(tinyPngBase64);
+  const imageList = [
+    assets.images.png.small_mario,
+    assets.images.png.etwe,
+    assets.images.png.self_drive,
+    assets.images.png.minions_banana_no_alpha,
+    assets.images.png.greyscale_bird,
+  ];
 
   for (let i = 1; i <= numRecords; i++) {
     const id = `rec-${i}`;
@@ -35,7 +39,12 @@ export default async (assets: Assets) => {
     page.drawText(`PDF/VT VDP Sample — ${id}`, { x: 50, y: 180, size: 14 });
     page.drawText(`Recipient: Recipient ${i}`, { x: 50, y: 160, size: 10 });
     page.drawText(`Note: VDP sample ${i}`, { x: 50, y: 144, size: 10 });
-    page.drawImage(img, { x: 300, y: 80, width: 48, height: 48 });
+
+    // Embed a different image per page
+    const imgBytes = imageList[(i - 1) % imageList.length];
+    const embedded = await (imgBytes.slice(0, 4).toString() === '%PDF' ? pdfDoc.embedJpg(imgBytes) : pdfDoc.embedPng(imgBytes));
+    page.drawImage(embedded, { x: 300, y: 80, width: 64, height: 64 });
+
     page.setDPart(record.asDict());
   }
 

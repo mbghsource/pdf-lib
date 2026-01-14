@@ -1,21 +1,75 @@
 import { PDFDocument, DPart, StandardFonts } from 'src/api';
-import { PDFName, PDFStream } from 'src/core';
+import { PDFName, PDFStream, PDFArray } from 'src/core';
 import PDFDict from 'src/core/objects/PDFDict';
 
 describe('PDF/VT & PDFX helpers', () => {
-  test('DPart root creation and page linking', async () => {
+  test('DPart root creation and page linking (VDP multiple records with images and attributes)', async () => {
     const pdfDoc = await PDFDocument.create();
+    pdfDoc.registerFontkit((await import('@pdf-lib/fontkit')).default);
     const droot = pdfDoc.createDPartRoot();
-    const child = DPart.createNode(pdfDoc.context, 'LogicalRecord');
-    child.setAttr('ID', 'rec-1', pdfDoc.context);
-    droot.addChild(pdfDoc.context, child);
+
+    // Use several images to simulate per-recipient variable content
+    const tinyPngBase64 =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQYV2NgYAAAAAMAAWgmWQ0AAAAASUVORK5CYII=';
+
+    const records: any[] = [];
+    const num = 5;
+    for (let i = 1; i <= num; i++) {
+      const child = DPart.createNode(pdfDoc.context, 'LogicalRecord');
+      child.setAttr('ID', `rec-${i}`, pdfDoc.context);
+      child.setAttr('Name', `Recipient ${i}`, pdfDoc.context);
+      child.setAttr('Note', `VDP sample ${i}`, pdfDoc.context);
+
+      // Embed a small image per record to simulate variable data
+      const img = await pdfDoc.embedPng(tinyPngBase64);
+
+      pdfDoc.context.register(child.asDict());
+      droot.addChild(pdfDoc.context, child);
+      records.push({ child, img });
+
+      const page = pdfDoc.addPage([400, 260]);
+      page.drawImage(img, { x: 300, y: 80, width: 48, height: 48 });
+      page.setDPart(child.asDict());
+    }
+
     pdfDoc.setDPartRoot(droot);
 
-    const page = pdfDoc.addPage();
-    page.setDPart(child.asDict());
+    // Ensure resources (fonts/images) are embedded and registered
+    await pdfDoc.ensureResourcesForPrint();
 
-    const pageDPart = page.node.get(PDFName.of('DPart'));
-    expect(pageDPart).toBeDefined();
+    // Verify all pages have DPart references and those DParts are present in root
+    const pages = pdfDoc.getPages();
+    expect(pages.length).toBe(num);
+    for (let i = 0; i < pages.length; i++) {
+      const p = pages[i];
+      const pdRef = p.node.get(PDFName.of('DPart'));
+      expect(pdRef).toBeDefined();
+
+      // The DPart should be resolvable
+      const pd = pdfDoc.context.lookup(pdRef as any, (PDFDict as any));
+      expect(pd).toBeDefined();
+
+      // The DPart should have required attributes
+      expect((pd as any).get(PDFName.of('ID'))).toBeDefined();
+      expect((pd as any).get(PDFName.of('Name'))).toBeDefined();
+    }
+
+    // Names should include Images registration
+    const namesRef = pdfDoc.catalog.get(PDFName.of('Names')) as any;
+    expect(namesRef).toBeDefined();
+    const names = pdfDoc.context.lookup(namesRef, (PDFDict as any));
+    expect(names).toBeDefined();
+
+    const imgsArr = (names as any).lookupMaybe(PDFName.of('Images'), (PDFArray as any));
+    expect(imgsArr).toBeDefined();
+    expect((imgsArr as any).size()).toBeGreaterThan(0);
+
+    // Resolve each image entry and ensure it is a stream
+    for (let j = 1; j < (imgsArr as any).size(); j += 2) {
+      const ref = (imgsArr as any).lookup(j);
+      const obj = pdfDoc.context.lookup(ref as any);
+      expect(obj).toBeDefined();
+    }
   });
 
   test('Inject PDF/VT XMP metadata', async () => {
