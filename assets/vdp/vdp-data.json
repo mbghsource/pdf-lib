@@ -1,0 +1,26 @@
+[
+  {
+    "id": "rec-1",
+    "name": "Alice",
+    "note": "Welcome Alice",
+    "image": "small_mario.png"
+  },
+  {
+    "id": "rec-2",
+    "name": "Bob",
+    "note": "Special offer for Bob",
+    "image": "minions_laughing.jpg"
+  },
+  {
+    "id": "rec-3",
+    "name": "Carol",
+    "note": "Hello Carol",
+    "image": "cat_riding_unicorn.jpg"
+  },
+  {
+    "id": "rec-4",
+    "name": "Dan",
+    "note": "Offer for Dan",
+    "image": "greyscale_bird.png"
+  }
+]
